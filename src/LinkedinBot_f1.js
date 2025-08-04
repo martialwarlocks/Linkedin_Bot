@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, LinkedinIcon, Video, FileText, Database, TrendingUp, Users, Lightbulb, Copy, Settings, Plus, Trash2, Edit3, Save, X, Search, BookOpen, UserPlus, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { Send, Bot, User, LinkedinIcon, Video, FileText, Database, TrendingUp, Users, Lightbulb, Copy, Settings, Plus, Trash2, Edit3, Save, X, Search, BookOpen, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // Supabase client initialization
 const createSupabaseClient = () => {
@@ -187,30 +187,18 @@ const LinkedInContentBot = () => {
   const [editingResearch, setEditingResearch] = useState(null);
   const [editingCreator, setEditingCreator] = useState(null);
 
-  // Initialize Supabase client
-  useEffect(() => {
-    if (config.supabaseUrl && config.supabaseKey) {
-      const client = createSupabaseClient();
-      setSupabaseClient(client);
-      loadResearchFromSupabase(client);
-    }
-  }, [config.supabaseUrl, config.supabaseKey]);
-
-  // Auto-resize textarea
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  }, [inputValue]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  // Fixed handleInputChange function - defined early
+  const handleInputChange = (e) => {
+    setInputValue(e.target.value);
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  // Fixed handleKeyDown function - defined early
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
 
   // Supabase operations
   const loadResearchFromSupabase = async (client = supabaseClient) => {
@@ -233,6 +221,47 @@ const LinkedInContentBot = () => {
     }
   };
 
+  // Initialize Supabase client
+  useEffect(() => {
+    if (config.supabaseUrl && config.supabaseKey) {
+      const client = createSupabaseClient();
+      setSupabaseClient(client);
+      loadResearchFromSupabase(client);
+    }
+  }, [config.supabaseUrl, config.supabaseKey]);
+
+  // Fixed Auto-resize textarea effect - no dependency on inputValue
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const adjustHeight = () => {
+        textarea.style.height = 'auto';
+        const maxHeight = 128; // 8rem equivalent
+        const newHeight = Math.min(textarea.scrollHeight, maxHeight);
+        textarea.style.height = `${newHeight}px`;
+      };
+      
+      // Add event listener instead of running on every inputValue change
+      textarea.addEventListener('input', adjustHeight);
+      
+      // Initial adjustment
+      adjustHeight();
+      
+      // Cleanup
+      return () => {
+        textarea.removeEventListener('input', adjustHeight);
+      };
+    }
+  }, []); // No dependencies
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
   // Database operations
   const addResearch = async () => {
     if (!newResearch.topic.trim()) return;
@@ -248,7 +277,7 @@ const LinkedInContentBot = () => {
 
     if (supabaseClient) {
       try {
-        const { data, error } = await supabaseClient.from('research').insert([research]);
+        const { error } = await supabaseClient.from('research').insert([research]);
         if (error) throw error;
         
         await loadResearchFromSupabase();
@@ -476,13 +505,6 @@ Return your response in this JSON format:
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
   };
 
   const filteredResearch = researchDatabase.filter(item =>
@@ -1382,10 +1404,11 @@ Return your response in this JSON format:
             <textarea
               ref={textareaRef}
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
               placeholder="Ask me to create content in any creator's style using your research..."
               className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-gray-500 resize-none min-h-12 max-h-32"
+              style={{ minHeight: '48px', maxHeight: '128px' }}
               rows="1"
             />
           </div>

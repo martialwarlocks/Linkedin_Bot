@@ -15,7 +15,7 @@ const createSupabaseClient = () => {
     from: (table) => ({
       select: async (columns = '*') => {
         try {
-          const response = await fetch(`${supabaseUrl}/rest/v1/${table}?select=${columns}&order=created_at.desc`, {
+          const response = await fetch(`${supabaseUrl}/rest/v1/${table}?select=${columns}`, {
             headers: {
               'apikey': supabaseKey,
               'Authorization': `Bearer ${supabaseKey}`,
@@ -48,29 +48,20 @@ const createSupabaseClient = () => {
         }
       },
       update: async (data) => ({
-        eq: async (column, value) => {
-          try {
-            const response = await fetch(`${supabaseUrl}/rest/v1/${table}?${column}=eq.${value}`, {
-              method: 'PATCH',
-              headers: {
-                'apikey': supabaseKey,
-                'Authorization': `Bearer ${supabaseKey}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation'
-              },
-              body: JSON.stringify(data)
-            });
-            
-            if (!response.ok) {
-              const errorData = await response.json();
-              return { data: null, error: errorData };
-            }
-            
-            const result = await response.json();
-            return { data: result, error: null };
-          } catch (error) {
-            return { data: null, error };
-          }
+        eq: (column, value) => {
+          return fetch(`${supabaseUrl}/rest/v1/${table}?${column}=eq.${value}`, {
+            method: 'PATCH',
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(data)
+          })
+          .then(res => res.json())
+          .then(result => ({ data: result, error: null }))
+          .catch(error => ({ data: null, error }));
         }
       }),
       delete: async () => ({
@@ -172,10 +163,15 @@ const LinkedInContentBot = () => {
   const [supabaseClient, setSupabaseClient] = useState(null);
   const [isLoadingResearch, setIsLoadingResearch] = useState(false);
 
+
+
   const [editingResearch, setEditingResearch] = useState(null);
   const [editingCreator, setEditingCreator] = useState(null);
 
-  // Supabase operations with improved sorting
+  // Simple input handlers
+
+
+  // Supabase operations
   const loadResearchFromSupabase = async (client = supabaseClient) => {
     if (!client) return;
     
@@ -184,16 +180,11 @@ const LinkedInContentBot = () => {
       const { data, error } = await client.from('research').select('*');
       if (error) throw error;
       
-      // Sort by date descending (newest first) and process data
-      const sortedData = data
-        .map(item => ({
-          ...item,
-          tags: typeof item.tags === 'string' ? item.tags.split(',').map(t => t.trim()) : (item.tags || []),
-          dateAdded: new Date(item.created_at || item.dateAdded)
-        }))
-        .sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
-      
-      setResearchDatabase(sortedData);
+      setResearchDatabase(data.map(item => ({
+        ...item,
+        tags: typeof item.tags === 'string' ? item.tags.split(',').map(t => t.trim()) : (item.tags || []),
+        dateAdded: new Date(item.created_at || item.dateAdded)
+      })));
     } catch (error) {
       console.error('Error loading research:', error);
     } finally {
@@ -215,16 +206,11 @@ const LinkedInContentBot = () => {
           const { data, error } = await client.from('research').select('*');
           if (error) throw error;
           
-          // Sort by date descending (newest first) and process data
-          const sortedData = data
-            .map(item => ({
-              ...item,
-              tags: typeof item.tags === 'string' ? item.tags.split(',').map(t => t.trim()) : (item.tags || []),
-              dateAdded: new Date(item.created_at || item.dateAdded)
-            }))
-            .sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
-          
-          setResearchDatabase(sortedData);
+          setResearchDatabase(data.map(item => ({
+            ...item,
+            tags: typeof item.tags === 'string' ? item.tags.split(',').map(t => t.trim()) : (item.tags || []),
+            dateAdded: new Date(item.created_at || item.dateAdded)
+          })));
         } catch (error) {
           console.error('Error loading research:', error);
         } finally {
@@ -235,6 +221,8 @@ const LinkedInContentBot = () => {
     }
   }, [config.supabaseUrl, config.supabaseKey]);
 
+
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -242,6 +230,8 @@ const LinkedInContentBot = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+
 
   const deleteResearch = async (id) => {
     if (supabaseClient) {
@@ -260,144 +250,32 @@ const LinkedInContentBot = () => {
   };
 
   const updateResearch = async (id, updatedData) => {
-    console.log('Updating research:', id, updatedData);
-    
     const updated = {
-      topic: updatedData.topic,
-      findings: updatedData.findings,
-      source: updatedData.source,
-      data: updatedData.data,
+      ...updatedData,
       tags: typeof updatedData.tags === 'string' 
         ? updatedData.tags.split(',').map(tag => tag.trim()).filter(tag => tag).join(',')
         : (Array.isArray(updatedData.tags) ? updatedData.tags.join(',') : updatedData.tags)
     };
 
-    // Update local state immediately for better UX
-    setResearchDatabase(prev => prev.map(item => 
-      item.id === id ? { 
-        ...item, 
-        topic: updatedData.topic,
-        findings: updatedData.findings,
-        source: updatedData.source,
-        data: updatedData.data,
-        tags: typeof updatedData.tags === 'string' 
-          ? updatedData.tags.split(',').map(t => t.trim()).filter(t => t)
-          : (Array.isArray(updatedData.tags) ? updatedData.tags : []),
-        dateAdded: item.dateAdded // Keep original date
-      } : item
-    ));
-
     if (supabaseClient) {
       try {
-        console.log('Sending to Supabase:', updated);
         const { error } = await supabaseClient.from('research').update(updated).eq('id', id);
-        if (error) {
-          console.error('Supabase update error:', error);
-          throw error;
-        }
-        console.log('Supabase update successful');
+        if (error) throw error;
         
-        // Reload from database to ensure consistency
         await loadResearchFromSupabase();
       } catch (error) {
-        console.error('Error updating research in Supabase:', error);
-        // Local update is already done, so we keep it
+        console.error('Error updating research:', error);
+        setResearchDatabase(prev => prev.map(item => 
+          item.id === id ? { ...item, ...updated, tags: updated.tags.split(',').map(t => t.trim()) } : item
+        ));
       }
+    } else {
+      setResearchDatabase(prev => prev.map(item => 
+        item.id === id ? { ...item, ...updated, tags: updated.tags.split(',').map(t => t.trim()) } : item
+      ));
     }
     
     setEditingResearch(null);
-  };
-
-  // Improved research filtering and relevance scoring - ALWAYS returns multiple items
-  const findRelevantResearch = (text, maxResults = 5) => {
-    console.log('Finding research for:', text);
-    console.log('Total research items available:', researchDatabase.length);
-    
-    const lowerText = text.toLowerCase();
-    const searchTerms = lowerText.split(' ').filter(term => term.length > 2);
-    
-    // Score each research item based on relevance
-    const scoredResearch = researchDatabase.map(item => {
-      let score = 0;
-      const itemText = `${item.topic} ${item.findings} ${item.data} ${(Array.isArray(item.tags) ? item.tags.join(' ') : '')}`.toLowerCase();
-      
-      // Exact phrase matches get highest score
-      if (itemText.includes(lowerText)) {
-        score += 10;
-      }
-      
-      // Topic matches get high score
-      if (item.topic.toLowerCase().includes(lowerText)) {
-        score += 8;
-      }
-      
-      // Tag matches get medium-high score
-      if (Array.isArray(item.tags)) {
-        item.tags.forEach(tag => {
-          if (lowerText.includes(tag.toLowerCase()) || tag.toLowerCase().includes(lowerText)) {
-            score += 6;
-          }
-        });
-      }
-      
-      // Individual word matches
-      searchTerms.forEach(term => {
-        if (itemText.includes(term)) {
-          score += 2;
-        }
-        if (item.topic.toLowerCase().includes(term)) {
-          score += 3;
-        }
-      });
-      
-      // Recency bonus (newer research gets slight boost)
-      const daysSinceAdded = (new Date() - new Date(item.dateAdded)) / (1000 * 60 * 60 * 24);
-      if (daysSinceAdded < 7) score += 1;
-      if (daysSinceAdded < 30) score += 0.5;
-      
-      return { ...item, relevanceScore: score };
-    });
-    
-    // Sort by relevance score and date, then take top results
-    const sortedByRelevance = scoredResearch
-      .sort((a, b) => {
-        if (b.relevanceScore !== a.relevanceScore) {
-          return b.relevanceScore - a.relevanceScore;
-        }
-        // If scores are equal, prefer newer research
-        return new Date(b.dateAdded) - new Date(a.dateAdded);
-      });
-    
-    // FORCE multiple items - always return at least 3 items if available
-    const minItems = Math.min(3, researchDatabase.length);
-    const targetItems = Math.min(maxResults, researchDatabase.length);
-    
-    console.log('Min items required:', minItems, 'Target items:', targetItems);
-    
-    // Take the top scored items
-    let finalResults = sortedByRelevance.slice(0, targetItems);
-    
-    // If we have fewer than minItems, add more from the database
-    if (finalResults.length < minItems && researchDatabase.length >= minItems) {
-      const usedIds = new Set(finalResults.map(item => item.id));
-      const additionalItems = researchDatabase
-        .filter(item => !usedIds.has(item.id))
-        .sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded))
-        .slice(0, minItems - finalResults.length);
-      
-      finalResults = [...finalResults, ...additionalItems];
-    }
-    
-    // If we still have fewer than minItems, just take the most recent items
-    if (finalResults.length < minItems && researchDatabase.length > 0) {
-      finalResults = researchDatabase
-        .sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded))
-        .slice(0, minItems);
-    }
-    
-    console.log('Final research items selected:', finalResults.length, finalResults.map(r => r.topic));
-    
-    return finalResults;
   };
 
   // OpenAI Integration for multiple variations
@@ -417,24 +295,13 @@ Style characteristics:
 - Common endings: ${creatorStyle.style.endings.join(', ')}
 - Key characteristics: ${creatorStyle.style.characteristics}
 
-Research data to incorporate (prioritized by relevance and recency):
-${relevantResearch.map((r, index) => `
-${index + 1}. Topic: ${r.topic}
-   Findings: ${r.findings}
-   Data: ${r.data}
-   Source: ${r.source}
-   Date Added: ${r.dateAdded.toLocaleDateString()}
-   ${r.relevanceScore ? `Relevance Score: ${r.relevanceScore.toFixed(1)}` : ''}
+Research data to incorporate:
+${relevantResearch.map(r => `
+Topic: ${r.topic}
+Findings: ${r.findings}
+Data: ${r.data}
+Source: ${r.source}
 `).join('\n')}
-
-CRITICAL INSTRUCTION: You MUST use information from ALL ${relevantResearch.length} research items provided above. Do NOT focus on just one research item. Your task is to:
-
-1. COMBINE insights from multiple research sources
-2. Reference specific data points from different research items
-3. Weave together findings from various topics
-4. Create comprehensive content that draws from the full research database
-
-For each variation, explicitly reference at least 2-3 different research items by topic or source. Make the content richer by connecting insights across multiple research areas.
 
 Create TWO DIFFERENT variations each for LinkedIn posts and video scripts that incorporate this research data in the creator's authentic style. Make sure each variation is distinct in approach while maintaining the creator's voice.
 
@@ -517,47 +384,29 @@ Return your response in this JSON format:
         }
       }
 
-      // Find relevant research using improved algorithm
-      const relevantResearch = findRelevantResearch(text, 5);
+      // Find relevant research
+      const relevantResearch = researchDatabase.filter(item => 
+        item.topic.toLowerCase().includes(lowerText) ||
+        (Array.isArray(item.tags) && item.tags.some(tag => lowerText.includes(tag.toLowerCase()))) ||
+        item.findings.toLowerCase().includes(lowerText)
+      ).slice(0, 3);
+
+      if (relevantResearch.length === 0 && researchDatabase.length > 0) {
+        relevantResearch.push(researchDatabase[0]);
+      }
 
       if (!config.openaiApiKey) {
         throw new Error('Please configure OpenAI API key in settings to generate content');
       }
 
-      // Debug log to see how many research items we're using
-      console.log(`Using ${relevantResearch.length} research items:`, relevantResearch.map(r => r.topic));
-      console.log('Research details:', relevantResearch.map(r => ({
-        topic: r.topic,
-        score: r.relevanceScore,
-        date: r.dateAdded
-      })));
-
       const content = await generateContentWithOpenAI(text, creatorStyle, relevantResearch);
 
       setGeneratedContent(content);
       
-      let responseText = `I've created 2 variations for each content type in ${creatorStyle.name}'s style.`;
-      
-      if (relevantResearch.length > 0) {
-        responseText += ` I analyzed ${relevantResearch.length} research items: ${relevantResearch.map(r => r.topic).join(', ')}.`;
-        
-        // Show relevance scores for debugging
-        const topScores = relevantResearch.slice(0, 3).map(r => 
-          r.relevanceScore ? `${r.topic} (${r.relevanceScore.toFixed(1)})` : r.topic
-        );
-        if (topScores.length > 0) {
-          responseText += ` Top matches: ${topScores.join(', ')}.`;
-        }
-      } else {
-        responseText += ` No specific research matched your query, but you can add relevant research to improve future content generation.`;
-      }
-      
-      responseText += ` Use the navigation arrows to choose your preferred options.`;
-      
       const botResponse = {
         id: Date.now() + 1,
         type: 'bot',
-        text: responseText,
+        text: `I've created 2 variations for each content type in ${creatorStyle.name}'s style using your research data. Use the navigation arrows to choose your preferred options.`,
         timestamp: new Date()
       };
       
@@ -586,8 +435,6 @@ Return your response in this JSON format:
     navigator.clipboard.writeText(text);
   };
 
-  // This variable is used in the ResearchTab component
-  // eslint-disable-next-line no-unused-vars
   const filteredResearch = researchDatabase;
 
   const ConfigPanel = () => (
@@ -842,7 +689,7 @@ Return your response in this JSON format:
           }, ...prev]);
         }
       } else {
-        // Local storage fallback - ensure newest items appear first
+        // Local storage fallback
         setResearchDatabase(prev => [{
           ...research,
           id: Date.now(),
@@ -865,7 +712,7 @@ Return your response in this JSON format:
             <div className="mb-6 p-3 rounded-lg bg-gray-100 border border-gray-200 flex items-center gap-2 text-sm">
               <div className={`w-2 h-2 rounded-full ${supabaseClient ? 'bg-green-500' : 'bg-red-500'}`}></div>
               <span className="text-gray-600">
-                {supabaseClient ? 'Connected to Supabase - Research sorted by newest first' : 'Using local storage - Research sorted by newest first'}
+                {supabaseClient ? 'Connected to Supabase' : 'Using local storage'}
               </span>
             </div>
             
@@ -968,46 +815,25 @@ Return your response in this JSON format:
               </div>
             )}
 
-            {/* Research Count */}
-            {filteredResearch.length > 0 && (
-              <div className="mb-4 text-sm text-gray-600">
-                Showing {filteredResearch.length} research item{filteredResearch.length !== 1 ? 's' : ''} 
-                {localSearchTerm && ` matching "${localSearchTerm}"`}
-                {filteredResearch.length > 0 && ` (sorted by newest first)`}
-              </div>
-            )}
-
             {/* Research List */}
             <div className="space-y-4">
               {filteredResearch.length === 0 && !isLoadingResearch && (
                 <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
                   <Database className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">
-                    {localSearchTerm ? `No research found matching "${localSearchTerm}"` : 'No research found. Add your first research above!'}
-                  </p>
+                  <p className="text-gray-600">No research found. Add your first research above!</p>
                 </div>
               )}
               
-              {filteredResearch.map((research, index) => (
+              {filteredResearch.map((research) => (
                 <div key={research.id} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                   {editingResearch === research.id ? (
                     <ResearchEditForm research={research} onSave={updateResearch} onCancel={() => setEditingResearch(null)} />
                   ) : (
                     <div>
                       <div className="flex justify-between items-start mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="text-lg font-medium text-gray-900">{research.topic}</h3>
-                            {index < 3 && (
-                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
-                                Recent
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-600 mb-2">{research.source}</p>
-                          <p className="text-xs text-gray-500">
-                            Added: {new Date(research.dateAdded).toLocaleDateString()} at {new Date(research.dateAdded).toLocaleTimeString()}
-                          </p>
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">{research.topic}</h3>
+                          <p className="text-sm text-gray-600 mb-3">{research.source}</p>
                         </div>
                         <div className="flex gap-2">
                           <button
@@ -1036,6 +862,9 @@ Return your response in this JSON format:
                           </span>
                         ))}
                       </div>
+                      <p className="text-xs text-gray-500">
+                        Added: {research.dateAdded.toLocaleDateString()}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1448,6 +1277,11 @@ Return your response in this JSON format:
                       <Copy className="w-4 h-4" />
                     </button>
                   </div>
+                </div>
+                
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Original Prompt:</h4>
+                  <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{entry.prompt}</p>
                 </div>
                 
                 <div className="mb-4">
