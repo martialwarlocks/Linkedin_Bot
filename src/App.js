@@ -1,5 +1,170 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Linkedin, Video, FileText, Database, TrendingUp, Users, Lightbulb, Copy, Settings, Plus, Trash2, Edit3, Save, X, Search, BookOpen, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Send, Bot, User, Linkedin, Video, FileText, Database, TrendingUp, Users, Lightbulb, Copy, Settings, Plus, Trash2, Edit3, Save, X, Search, BookOpen, UserPlus, ChevronLeft, ChevronRight, Upload, Globe, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+
+// 🔧 CONFIGURATION - UPDATE THIS WITH YOUR BACKEND URL
+const BACKEND_CONFIG = {
+  // 🚨 CHANGE THIS TO YOUR DEPLOYED BACKEND URL
+  url: 'http://localhost:8000', // Replace with your Cloud Run URL
+  
+  // For local development, use: 'http://localhost:8000'
+  // For production, use: 'https://your-service-name-project-id.region.run.app'
+};
+
+// Cloud Document Manager - Updated to match your backend API
+const createCloudDocumentManager = () => {
+  const BACKEND_URL = BACKEND_CONFIG.url;
+  
+  return {
+    // Upload document to cloud storage
+    uploadDocument: async (file) => {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch(`${BACKEND_URL}/upload`, {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || `Upload failed: ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('Cloud upload error:', error);
+        throw error;
+      }
+    },
+
+    // Get all documents from cloud storage
+    getDocuments: async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/documents`);
+        
+        if (!response.ok) {
+          throw new Error(`Get documents failed: ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('Cloud get documents error:', error);
+        throw error;
+      }
+    },
+
+    // Delete document from cloud storage
+    deleteDocument: async (filename) => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/documents/${encodeURIComponent(filename)}`, {
+          method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || `Delete failed: ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('Cloud delete error:', error);
+        throw error;
+      }
+    },
+
+    // Ask questions using the backend's /ask endpoint
+    askQuestion: async (question) => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/ask`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ question })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || `Ask failed: ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('Cloud ask error:', error);
+        throw error;
+      }
+    },
+
+    // Crawl website and store in cloud
+    crawlWebsite: async (url) => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/crawl`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ url })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || `Crawl failed: ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('Cloud crawl error:', error);
+        throw error;
+      }
+    },
+
+    // Get all chunks from backend
+    getAllChunks: async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/chunks`);
+        
+        if (!response.ok) {
+          throw new Error(`Get chunks failed: ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('Get chunks error:', error);
+        return [];
+      }
+    },
+
+    // Refresh index
+    refreshIndex: async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/refresh`, {
+          method: 'POST'
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Refresh failed: ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('Refresh error:', error);
+        throw error;
+      }
+    },
+
+    // Health check
+    healthCheck: async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/`);
+        return await response.json();
+      } catch (error) {
+        console.error('Health check error:', error);
+        return { status: 'offline' };
+      }
+    }
+  };
+};
 
 // Supabase client initialization
 const createSupabaseClient = () => {
@@ -97,7 +262,7 @@ const LinkedInContentBot = () => {
     {
       id: 1,
       type: 'bot',
-      text: "Welcome to the LinkedIn Content Creator Assistant. I help you create professional content in the style of industry leaders using your research data. How can I assist you today?",
+      text: "Welcome to the LinkedIn Content Creator Assistant with Cloud Document Integration! I can now access your uploaded documents and crawled websites to create better content. How can I assist you today?",
       timestamp: new Date()
     }
   ]);
@@ -170,10 +335,18 @@ const LinkedInContentBot = () => {
   const [promptHistory, setPromptHistory] = useState([]);
 
   const [supabaseClient, setSupabaseClient] = useState(null);
+  const [documentManager, setDocumentManager] = useState(null);
   const [isLoadingResearch, setIsLoadingResearch] = useState(false);
-
+  const [customDocuments, setCustomDocuments] = useState([]);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [editingResearch, setEditingResearch] = useState(null);
   const [editingCreator, setEditingCreator] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+
+  // Backend connection state
+  const [backendStatus, setBackendStatus] = useState('checking');
+  const [backendError, setBackendError] = useState(null);
 
   // Supabase operations with improved sorting
   const loadResearchFromSupabase = async (client = supabaseClient) => {
@@ -242,6 +415,48 @@ const LinkedInContentBot = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Initialize Cloud Document Manager and test connection
+  useEffect(() => {
+    const manager = createCloudDocumentManager();
+    setDocumentManager(manager);
+    
+    // Test backend connection on startup
+    const initializeBackend = async () => {
+      setBackendStatus('checking');
+      setBackendError(null);
+      
+      try {
+        const health = await manager.healthCheck();
+        console.log('Backend health check:', health);
+        
+        if (health.status && health.status.includes('online')) {
+          setBackendStatus('connected');
+          
+          // Load documents after successful connection
+          setIsLoadingDocuments(true);
+          try {
+            const documents = await manager.getDocuments();
+            setCustomDocuments(documents || []);
+          } catch (docError) {
+            console.error('Error loading documents:', docError);
+            setCustomDocuments([]);
+          } finally {
+            setIsLoadingDocuments(false);
+          }
+        } else {
+          throw new Error('Backend health check failed');
+        }
+      } catch (error) {
+        console.error('Backend connection failed:', error);
+        setBackendStatus('error');
+        setBackendError(error.message);
+        setCustomDocuments([]);
+      }
+    };
+    
+    initializeBackend();
+  }, []);
 
   const deleteResearch = async (id) => {
     if (supabaseClient) {
@@ -532,7 +747,19 @@ Return your response in this JSON format:
         date: r.dateAdded
       })));
 
-      const content = await generateContentWithOpenAI(text, creatorStyle, relevantResearch);
+      // Try cloud document manager first, fallback to OpenAI
+      let content;
+      try {
+        if (backendStatus === 'connected') {
+          content = await generateContentWithCloudDocuments(text, creatorStyle, relevantResearch);
+          console.log('Content generated using cloud document manager');
+        } else {
+          throw new Error('Backend not connected');
+        }
+      } catch (cloudError) {
+        console.log('Cloud document manager failed, using OpenAI fallback:', cloudError.message);
+        content = await generateContentWithOpenAI(text, creatorStyle, relevantResearch);
+      }
 
       setGeneratedContent(content);
       
@@ -540,16 +767,10 @@ Return your response in this JSON format:
       
       if (relevantResearch.length > 0) {
         responseText += ` I analyzed ${relevantResearch.length} research items: ${relevantResearch.map(r => r.topic).join(', ')}.`;
-        
-        // Show relevance scores for debugging
-        const topScores = relevantResearch.slice(0, 3).map(r => 
-          r.relevanceScore ? `${r.topic} (${r.relevanceScore.toFixed(1)})` : r.topic
-        );
-        if (topScores.length > 0) {
-          responseText += ` Top matches: ${topScores.join(', ')}.`;
-        }
-      } else {
-        responseText += ` No specific research matched your query, but you can add relevant research to improve future content generation.`;
+      }
+      
+      if (backendStatus === 'connected') {
+        responseText += ` I also searched through your uploaded documents for relevant context.`;
       }
       
       responseText += ` Use the navigation arrows to choose your preferred options.`;
@@ -860,6 +1081,8 @@ Return your response in this JSON format:
         <div className="p-6">
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">Research Database</h2>
+            
+            <BackendStatus />
             
             {/* Supabase Connection Status */}
             <div className="mb-6 p-3 rounded-lg bg-gray-100 border border-gray-200 flex items-center gap-2 text-sm">
@@ -1430,6 +1653,8 @@ Return your response in this JSON format:
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Prompt History</h2>
           
+          <BackendStatus />
+          
           <div className="space-y-4">
             {promptHistory.map((entry) => (
               <div key={entry.id} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
@@ -1451,6 +1676,13 @@ Return your response in this JSON format:
                 </div>
                 
                 <div className="mb-4">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Original Prompt:</h4>
+                  <div className="bg-gray-50 p-3 rounded-lg text-sm text-gray-700">
+                    {entry.prompt}
+                  </div>
+                </div>
+                
+                <div className="mb-4">
                   <h4 className="text-sm font-medium text-gray-700 mb-2">Research Used:</h4>
                   <div className="flex flex-wrap gap-2">
                     {entry.research.map((topic, index) => (
@@ -1460,6 +1692,19 @@ Return your response in this JSON format:
                     ))}
                   </div>
                 </div>
+                
+                {entry.backendSources && entry.backendSources.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Backend Sources Used:</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {entry.backendSources.map((source, index) => (
+                        <span key={index} className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+                          {source.filename}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 
                 <div className="border-t pt-4">
                   <h4 className="text-sm font-medium text-gray-700 mb-2">Generated Content:</h4>
@@ -1511,6 +1756,8 @@ Return your response in this JSON format:
       <>
         {/* Creator Selection */}
         <div className="bg-gray-50 border-b border-gray-200 px-6 py-5">
+          <BackendStatus />
+          
           <div className="mb-4">
             <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
               Creator Styles
@@ -1555,11 +1802,11 @@ Return your response in this JSON format:
                 <span className="text-sm font-medium text-gray-700">Browse Research</span>
               </button>
               <button
-                onClick={() => setActiveTab('creators')}
+                onClick={() => setActiveTab('documents')}
                 className="flex items-center gap-3 p-3.5 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:transform hover:-translate-y-0.5 hover:shadow-md transition-all text-left"
               >
                 <FileText className="w-4.5 h-4.5 text-gray-600" />
-                <span className="text-sm font-medium text-gray-700">Manage Creators</span>
+                <span className="text-sm font-medium text-gray-700">Manage Documents</span>
               </button>
             </div>
           </div>
@@ -1698,6 +1945,17 @@ Return your response in this JSON format:
               Creators ({creatorDatabase.length})
             </button>
             <button
+              onClick={() => setActiveTab('documents')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === 'documents'
+                  ? 'bg-gray-900 text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <Upload className="w-4 h-4" />
+              Documents ({customDocuments.length})
+            </button>
+            <button
               onClick={() => setActiveTab('history')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === 'history'
@@ -1729,6 +1987,7 @@ Return your response in this JSON format:
         {activeTab === 'chat' && <ChatTab />}
         {activeTab === 'research' && <ResearchTab />}
         {activeTab === 'creators' && <CreatorTab />}
+        {activeTab === 'documents' && <CustomDocumentsTab />}
         {activeTab === 'history' && <HistoryTab />}
       </div>
 
