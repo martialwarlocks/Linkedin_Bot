@@ -1,0 +1,20 @@
+backend:
+metadata pickle -> jsonl
+test smaller llama models
+test OpenAi's embedding models
+mirgate vexa.ai to backend
+contextual awareness
+explore Graph RAG
+explore Amazon Textract (probably no)
+webcrawler  
+Donut for diagram parsing or Pix2Struct
+Async lock
+
+frontend:
+
+Authentication
+
+
+ Process Files in Batches
+ Upload in background
+ Migrate vectorbd to pinecone

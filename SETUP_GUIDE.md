@@ -1,106 +1,255 @@
-# 🚀 Quick Setup Guide - Fix File Upload Issues
+# LinkedIn Content Creator - Setup Guide
 
-## 🎯 **Step 1: Start Your Backend**
+## System Architecture
 
-### **Option A: Using the startup script (Recommended)**
+The LinkedIn Content Creator is a full-stack AI-powered application with the following architecture:
+
+### Frontend (React.js)
+- **Technology**: React 19.1.0 with Tailwind CSS
+- **Purpose**: User interface for content creation, research management, and document processing
+- **Key Features**:
+  - Content generation interface
+  - Research database management
+  - Document upload and processing
+  - Web crawling interface
+  - Chat interface with AI
+  - Creator profiles management
+
+### Backend (FastAPI)
+- **Technology**: Python FastAPI with multiple AI/ML libraries
+- **Purpose**: AI content generation, document processing, and data management
+- **Key Components**:
+  - **Enhanced FastAPI Backend**: Main backend with advanced features
+  - **Document Processor**: Handles PDF, DOCX, PPTX, and other document formats
+  - **AI Generator**: OpenAI-powered content generation
+  - **Web Crawler**: Automated website content extraction
+  - **Vector Database**: ChromaDB for semantic search
+  - **Cloud Storage**: Google Cloud Storage integration
+
+### Database & Storage
+- **Supabase**: PostgreSQL database for user data and research
+- **ChromaDB**: Vector database for semantic search
+- **Google Cloud Storage**: Document storage
+- **Redis**: Caching and background task management
+
+### AI/ML Stack
+- **OpenAI GPT**: Content generation
+- **Sentence Transformers**: Text embeddings
+- **FAISS**: Vector similarity search
+- **Trafilatura**: Web content extraction
+- **BeautifulSoup**: HTML parsing
+
+## Prerequisites
+
+### System Requirements
+- **Node.js**: 18.x or higher
+- **Python**: 3.9 or higher
+- **Git**: Latest version
+- **Docker**: (Optional, for containerized deployment)
+
+### API Keys & Services
+- **OpenAI API Key**: For content generation
+- **Supabase Account**: Database and authentication
+- **Google Cloud Storage**: Document storage (optional)
+- **Groq API Key**: Alternative AI provider (optional)
+
+## Installation & Setup
+
+### 1. Clone the Repository
 ```bash
-# From the project root directory
-./start-backend.sh
+git clone <repository-url>
+cd linkedin-content-creator
 ```
 
-### **Option B: Manual setup**
-```bash
-# Navigate to backend directory
-cd backend
+### 2. Frontend Setup
 
-# Install dependencies
+#### Install Node.js Dependencies
+```bash
 npm install
+```
 
-# Create environment file
-cp env.example .env
+#### Environment Configuration
+Create a `.env` file in the root directory:
+```env
+REACT_APP_BACKEND_URL=http://localhost:8000
+REACT_APP_SUPABASE_URL=your_supabase_url
+REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-# Edit .env file with your Google Cloud settings
-# GOOGLE_CLOUD_PROJECT_ID=your-project-id
-# GOOGLE_CLOUD_KEY_FILE=./google-cloud-key.json
-# LINKEDIN_BOT_BUCKET=linkedin-bot-documents
+### 3. Backend Setup
 
-# Start the backend
+#### Create Python Virtual Environment
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+#### Install Python Dependencies
+```bash
+# For enhanced backend
+cd enhanced-fastapi-backend
+pip install -r requirements.txt
+
+# For local development
+cd ..
+pip install -r local-requirements.txt
+```
+
+#### Environment Configuration
+Create a `.env` file in the `enhanced-fastapi-backend` directory:
+```env
+OPENAI_API_KEY=your_openai_api_key
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_service_key
+GOOGLE_APPLICATION_CREDENTIALS=path_to_your_gcs_credentials.json
+GCS_BUCKET_NAME=your_bucket_name
+GCS_PROJECT_ID=your_project_id
+```
+
+### 4. Database Setup
+
+#### Supabase Configuration
+1. Create a new Supabase project
+2. Run the SQL schema from `supabase-schema.sql`
+3. Update the configuration in `backend-config.json`
+
+#### Vector Database
+The ChromaDB will be automatically initialized when the backend starts.
+
+## Running the Application
+
+### Development Mode
+
+#### Start the Backend
+```bash
+# Option 1: Enhanced FastAPI Backend
+cd enhanced-fastapi-backend
+uvicorn app:app --reload --host 0.0.0.0 --port 8000
+
+# Option 2: Local FastAPI Server
+cd ..
+python local-fastapi-server.py
+```
+
+#### Start the Frontend
+```bash
+# In a new terminal
 npm start
 ```
 
-## 🎯 **Step 2: Test Backend**
+The application will be available at:
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs
 
+### Production Mode
+
+#### Build Frontend
 ```bash
-# In a new terminal, run the test script
-cd backend
-node test-backend.js
+npm run build
 ```
 
-You should see:
-```
-🧪 Testing Backend Endpoints...
-
-1️⃣ Testing Health Check...
-✅ Health Check: { status: 'OK', service: 'LinkedIn Bot Document Manager' }
-
-2️⃣ Testing Root Endpoint...
-✅ Root Endpoint: { status: 'online', service: 'LinkedIn Bot Document Manager', ... }
-
-3️⃣ Testing Get Documents...
-✅ Documents: []
-
-4️⃣ Testing Get Chunks...
-✅ Chunks: []
-
-🎉 All tests passed! Backend is working correctly.
-```
-
-## 🎯 **Step 3: Start Your Frontend**
-
+#### Deploy Backend
 ```bash
-# In another terminal, start the frontend
-npm start
+# Using Docker
+cd enhanced-fastapi-backend
+docker build -t linkedin-content-creator .
+docker run -p 8000:8000 linkedin-content-creator
+
+# Or using uvicorn directly
+uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
-## 🎯 **Step 4: Test File Upload**
+## API Endpoints
 
-1. Open your app in the browser
-2. Go to the "Documents" tab
-3. Click "Choose File" and select a PDF
-4. Click "Upload"
-5. Check the browser console for detailed logs
+### Core Endpoints
+- `GET /` - Health check
+- `POST /linkedin/generate` - Generate content
+- `POST /linkedin/upload-document` - Upload documents
+- `POST /linkedin/crawl` - Crawl websites
+- `GET /linkedin/research` - Get research data
+- `POST /linkedin/research` - Add research
+- `GET /linkedin/documents` - Get uploaded documents
+- `GET /linkedin/crawls` - Get web crawls
+- `POST /linkedin/search` - Semantic search
 
-## 🔧 **Troubleshooting**
+### Content Generation
+- `POST /linkedin/generate` - Generate LinkedIn posts, video scripts, hashtags
+- `POST /linkedin/research-summary` - Generate research summaries
+- `POST /linkedin/document-insights` - Extract insights from documents
 
-### **If backend won't start:**
-- Check if port 8000 is available
-- Verify Google Cloud credentials
-- Check `.env` file configuration
+## Features
 
-### **If upload fails:**
-- Check browser console for error messages
-- Verify backend is running on `http://localhost:8000`
-- Check file size (max 10MB)
-- Check file type (PDF, DOCX, etc.)
+### Content Generation
+- **LinkedIn Posts**: Professional posts with engagement optimization
+- **Video Scripts**: YouTube/TikTok style video content
+- **Hashtags**: Trending and relevant hashtag suggestions
+- **Engagement Tips**: Strategies to increase engagement
 
-### **If files don't appear:**
-- Check browser console logs
-- Verify Google Cloud Storage bucket exists
-- Check backend logs for errors
+### Research Management
+- **Document Upload**: Support for PDF, DOCX, PPTX, TXT files
+- **Web Crawling**: Automated content extraction from websites
+- **Semantic Search**: AI-powered research discovery
+- **Research Database**: Organized storage and categorization
 
-## 📝 **Common Issues & Solutions**
+### AI Capabilities
+- **Multi-Modal Processing**: Text, documents, and web content
+- **Context-Aware Generation**: Uses research and documents as context
+- **Creator Profiles**: Customizable AI personalities
+- **Smart Question Answering**: Chat interface with research context
 
-### **Issue: "Backend connection failed"**
-**Solution:** Make sure backend is running on port 8000
+## Troubleshooting
 
-### **Issue: "Google Cloud credentials not found"**
-**Solution:** Download service account key and place in `backend/google-cloud-key.json`
+### Common Issues
 
-### **Issue: "Bucket not found"**
-**Solution:** Create bucket: `gsutil mb gs://linkedin-bot-documents`
+#### Backend Connection Issues
+- Check if the backend is running on port 8000
+- Verify CORS settings in the backend
+- Check API key configurations
 
-### **Issue: "Upload failed: 413"**
-**Solution:** File too large, reduce file size (max 10MB)
+#### Document Upload Issues
+- Ensure file size limits are appropriate
+- Check Google Cloud Storage credentials
+- Verify file format support
 
-### **Issue: "Invalid file type"**
-**Solution:** Only PDF, DOCX, XLSX, PPTX, TXT, HTML files are supported 
+#### AI Generation Issues
+- Verify OpenAI API key and quota
+- Check internet connectivity
+- Review error logs in the browser console
+
+### Logs and Debugging
+- Backend logs: Check terminal output
+- Frontend logs: Browser developer tools
+- API testing: Use http://localhost:8000/docs
+
+## Security Considerations
+
+- Store API keys in environment variables
+- Use HTTPS in production
+- Implement proper authentication
+- Regular security updates
+- Monitor API usage and costs
+
+## Performance Optimization
+
+- Use Redis for caching
+- Implement background tasks with Celery
+- Optimize vector database queries
+- Use CDN for static assets
+- Monitor memory usage
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## Support
+
+For issues and questions:
+- Check the troubleshooting section
+- Review API documentation
+- Check GitHub issues
+- Contact the development team 

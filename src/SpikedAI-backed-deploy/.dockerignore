@@ -1,0 +1,51 @@
+# Git and project files
+.git
+.gitignore
+.dockerignore
+README.md
+
+# Python virtual environment
+env/
+venv/
+.venv/
+okay/
+spikedAI/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Secrets - IMPORTANT: Never include secrets in the image
+.env
+*.env
+
+# Local dependencies that are installed by the Dockerfile
+# This is critical for keeping the image size down.
+poppler-24.08.0/
+
+# Test files - Not needed in the production image
+test_backend.py
+tests/
+
+# Development scripts and documentation
+code.sh
+deploy.sh
+Instructions.txt
+
+# Temporary and local data directories
+# The running container should be stateless
+temp_files/
+data/
+vector_db/
+static/
+templates/
+
+# IDE and OS-specific files
+.idea/
+.vscode/
+*.DS_Store
+
+testing/
+AddWhileTesting.txt

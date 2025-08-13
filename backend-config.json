@@ -1,0 +1,8 @@
+{
+  "openai_api_key": "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",
+  "groq_api_key": "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",
+  "supabase_url": "https://qgyqkgmdnwfcnzzuzict.supabase.co",
+  "supabase_anon_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFneXFrZ21kbndmY256enV6aWN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3NzkyOTcsImV4cCI6MjA2OTM1NTI5N30.d9VFOHZsWDxhqY8UM0jvx5pGJVVOSkgHVFODL16Nc6s",
+  "gcs_bucket_name": "linkedin-bot-documents",
+  "gcs_project_id": "linkedin-bot-468005"
+} 
