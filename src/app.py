@@ -29,7 +29,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # --- Configuration ---
-GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "spikedai-bucket-one")
+GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "linkedin-bot-documents")
 GROQ_MODEL = "llama-3.3-70b-versatile"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 BASE_URL = "https://linkedin-content-creator-api.run.app"

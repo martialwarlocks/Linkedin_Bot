@@ -4,7 +4,7 @@ import { Send, Bot, User, Linkedin, Video, FileText, Database, TrendingUp, Users
 // 🔧 CONFIGURATION - UPDATE THIS WITH YOUR BACKEND URL
 const BACKEND_CONFIG = {
   // 🚨 CHANGE THIS TO YOUR DEPLOYED BACKEND URL
-  url: 'https://linkedin-content-creator-api-11874687899.asia-south1.run.app', // Replace with your Cloud Run URL
+  url: 'https://linkedin-content-creator-api-2uz4glbzoq-uc.a.run.app', // Replace with your Cloud Run URL
   
   // For local development, use: 'http://localhost:8000'
   // For production, use: 'https://your-service-name-project-id.region.run.app'
@@ -175,18 +175,12 @@ const createCloudDocumentManager = () => {
   };
 };
 
-// In-memory storage for configuration (instead of localStorage)
-let configStore = {
-  openaiApiKey: '',
-  model: 'gpt-4',
-  supabaseUrl: '',
-  supabaseKey: ''
-};
+// Configuration removed - using environment variables
 
 // Supabase client initialization
 const createSupabaseClient = () => {
-  const supabaseUrl = configStore.supabaseUrl || '';
-  const supabaseKey = configStore.supabaseKey || '';
+  const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://qgyqkgmdnwfcnzzuzict.supabase.co';
+  const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFneXFrZ21kbndmY256enV6aWN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3NzkyOTcsImV4cCI6MjA2OTM1NTI5N30.d9VFOHZsWDxhqY8UM0jvx5pGJVVOSkgHVFODL16Nc6s';
   
   if (!supabaseUrl || !supabaseKey) {
     return null;
@@ -284,8 +278,6 @@ const LinkedInContentBot = () => {
   ]);
 
   const [isTyping, setIsTyping] = useState(false);
-  const [showConfig, setShowConfig] = useState(false);
-  const [config, setConfig] = useState(configStore);
   const [generatedContent, setGeneratedContent] = useState(null);
   const [selectedOptions, setSelectedOptions] = useState({
     linkedinPost: 0,
@@ -509,10 +501,10 @@ Create TWO DIFFERENT variations each for LinkedIn posts and video scripts. Retur
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.openaiApiKey}`
+          'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
         },
         body: JSON.stringify({
-          model: config.model,
+          model: 'gpt-3.5-turbo',
           messages: [
             { role: 'system', content: enhancedPrompt },
             { role: 'user', content: prompt }
@@ -551,7 +543,7 @@ Create TWO DIFFERENT variations each for LinkedIn posts and video scripts. Retur
 
   // OpenAI Integration for multiple variations (fallback)
   const generateContentWithOpenAI = async (prompt, creatorStyle, relevantResearch) => {
-    if (!config.openaiApiKey) {
+    if (!process.env.REACT_APP_OPENAI_API_KEY) {
       throw new Error('OpenAI API key not configured');
     }
 
@@ -600,10 +592,10 @@ Return your response in this JSON format:
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.openaiApiKey}`
+          'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
         },
         body: JSON.stringify({
-          model: config.model,
+          model: 'gpt-3.5-turbo',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: prompt }
@@ -648,8 +640,8 @@ Return your response in this JSON format:
 
   // Initialize Supabase client
   useEffect(() => {
-    if (config.supabaseUrl && config.supabaseKey) {
-      const client = createSupabaseClient();
+    const client = createSupabaseClient();
+    if (client) {
       setSupabaseClient(client);
       
       const loadResearch = async () => {
@@ -677,7 +669,7 @@ Return your response in this JSON format:
       };
       loadResearch();
     }
-  }, [config.supabaseUrl, config.supabaseKey]);
+  }, []);
 
   // Initialize Cloud Document Manager and test connection
   useEffect(() => {
@@ -896,8 +888,8 @@ Return your response in this JSON format:
 
       const relevantResearch = findRelevantResearch(text, 5);
 
-      if (!config.openaiApiKey) {
-        throw new Error('Please configure OpenAI API key in settings to generate content');
+      if (!process.env.REACT_APP_OPENAI_API_KEY) {
+        throw new Error('OpenAI API key not configured');
       }
 
       console.log(`Using ${relevantResearch.length} research items:`, relevantResearch.map(r => r.topic));
@@ -1069,97 +1061,6 @@ Return your response in this JSON format:
     }
   };
 
-  const ConfigPanel = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50" style={{ backdropFilter: 'blur(4px)' }}>
-      <div className="bg-white p-8 rounded-xl w-11/12 max-w-md shadow-2xl border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-6">Configuration</h3>
-        
-        {/* Backend URL Configuration */}
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h4 className="font-medium text-blue-900 mb-2">Backend Configuration</h4>
-          <p className="text-sm text-blue-800 mb-2">Current Backend URL:</p>
-          <code className="text-xs bg-blue-100 px-2 py-1 rounded text-blue-900 block break-all">
-            {BACKEND_CONFIG.url}
-          </code>
-          <p className="text-xs text-blue-700 mt-2">
-            To change this, update BACKEND_CONFIG.url in the code
-          </p>
-        </div>
-        
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            OpenAI API Key
-          </label>
-          <input
-            type="password"
-            value={config.openaiApiKey}
-            onChange={(e) => setConfig(prev => ({ ...prev, openaiApiKey: e.target.value }))}
-            placeholder="sk-..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-gray-500 transition-colors"
-          />
-        </div>
-
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Model
-          </label>
-          <select
-            value={config.model}
-            onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-gray-500 transition-colors"
-          >
-            <option value="gpt-4">GPT-4</option>
-            <option value="gpt-4-turbo">GPT-4 Turbo</option>
-            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-          </select>
-        </div>
-
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Supabase URL
-          </label>
-          <input
-            type="text"
-            value={config.supabaseUrl}
-            onChange={(e) => setConfig(prev => ({ ...prev, supabaseUrl: e.target.value }))}
-            placeholder="https://your-project.supabase.co"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-gray-500 transition-colors"
-          />
-        </div>
-
-        <div className="mb-8">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Supabase Anon Key
-          </label>
-          <input
-            type="password"
-            value={config.supabaseKey}
-            onChange={(e) => setConfig(prev => ({ ...prev, supabaseKey: e.target.value }))}
-            placeholder="eyJ..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-gray-500 transition-colors"
-          />
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={() => {
-              configStore = { ...config };
-              setShowConfig(false);
-            }}
-            className="flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
-          >
-            Save
-          </button>
-          <button
-            onClick={() => setShowConfig(false)}
-            className="px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 
   const ContentDisplay = ({ content }) => (
     <div className="bg-white border border-gray-200 rounded-xl p-6 mt-4 shadow-sm">
@@ -2377,15 +2278,6 @@ Return your response in this JSON format:
 
         <div className="flex-1"></div>
 
-        <div className="p-4 border-t border-gray-200">
-          <button
-            onClick={() => setShowConfig(true)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-          >
-            <Settings className="w-4 h-4" />
-            Settings
-          </button>
-        </div>
       </div>
 
       <div className="flex-1 flex flex-col">
@@ -2396,7 +2288,6 @@ Return your response in this JSON format:
         {activeTab === 'history' && <HistoryTab />}
       </div>
 
-      {showConfig && <ConfigPanel />}
     </div>
   );
 };
